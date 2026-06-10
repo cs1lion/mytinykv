@@ -279,7 +279,42 @@ func (c *RaftCluster) handleStoreHeartbeat(stats *schedulerpb.StoreStats) error 
 // processRegionHeartbeat updates the region information.
 func (c *RaftCluster) processRegionHeartbeat(region *core.RegionInfo) error {
 	// Your Code Here (3C).
+	c.Lock()
+	defer c.Unlock()
+	origin := c.core.GetRegion(region.GetID())
+	if origin != nil {
+		if origin.GetRegionEpoch().GetVersion() > region.GetRegionEpoch().GetVersion() || origin.GetRegionEpoch().GetConfVer() > region.GetRegionEpoch().GetConfVer() {
+			return ErrRegionIsStale(region.GetMeta(), origin.GetMeta())
+		}
+	} else {
+		overlaps := c.core.GetOverlaps(region)
+		for _, overlap := range overlaps {
+			if overlap.GetRegionEpoch().GetVersion() > region.GetRegionEpoch().GetVersion() || overlap.GetRegionEpoch().GetConfVer() > region.GetRegionEpoch().GetConfVer() {
+				return ErrRegionIsStale(region.GetMeta(), overlap.GetMeta())
+			}
+		}
+	}
+	if origin != nil &&
+		region.GetRegionEpoch().GetVersion() == origin.GetRegionEpoch().GetVersion() &&
+		region.GetRegionEpoch().GetConfVer() == origin.GetRegionEpoch().GetConfVer() &&
+		region.GetLeader().GetId() == origin.GetLeader().GetId() &&
+		len(region.GetPendingPeers()) == 0 && len(origin.GetPendingPeers()) == 0 &&
+		len(region.GetPeers()) == len(origin.GetPeers()) &&
+		region.GetApproximateSize() == origin.GetApproximateSize() {
+		return nil
+	}
 
+	oldRegions := c.core.PutRegion(region)
+
+	for _, peer := range region.GetPeers() {
+		c.updateStoreStatusLocked(peer.GetStoreId())
+	}
+	for _, old := range oldRegions {
+		for _, peer := range old.GetPeers() {
+			c.updateStoreStatusLocked(peer.StoreId)
+		}
+	}
+	c.prepareChecker.collect(region)
 	return nil
 }
 

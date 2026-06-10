@@ -114,6 +114,15 @@ func (r *SchedulerTaskHandler) onHeartbeat(t *SchedulerRegionHeartbeatTask) {
 		PendingPeers:    t.PendingPeers,
 		ApproximateSize: uint64(size),
 	}
+	//
+	// log.Infof("scheduler heartbeat region=%d start=%q end=%q epoch=%v peer=%v",
+	// 	req.Region.GetId(),
+	// 	req.Region.GetStartKey(),
+	// 	req.Region.GetEndKey(),
+	// 	req.Region.GetRegionEpoch(),
+	// 	req.Leader,
+	// )
+
 	r.SchedulerClient.RegionHeartbeat(req)
 }
 

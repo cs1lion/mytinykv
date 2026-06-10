@@ -106,6 +106,21 @@ func NewMockSchedulerClient(clusterID uint64, baseID uint64) *MockSchedulerClien
 	}
 }
 
+// for debug
+func (m *MockSchedulerClient) DebugRegions() []*metapb.Region {
+	m.RLock()
+	defer m.RUnlock()
+
+	regions := make([]*metapb.Region, 0)
+	m.regionsRange.Ascend(func(i btree.Item) bool {
+		r := i.(*regionItem).region
+		region := r
+		regions = append(regions, &region)
+		return true
+	})
+	return regions
+}
+
 // Implement SchedulerClient interface
 func (m *MockSchedulerClient) GetClusterID(ctx context.Context) uint64 {
 	m.RLock()

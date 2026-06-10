@@ -104,8 +104,8 @@ type Transport interface {
 	Send(msg *rspb.RaftMessage) error
 }
 
-/// loadPeers loads peers in this store. It scans the db engine, loads all regions and their peers from it
-/// WARN: This store should not be used before initialized.
+// / loadPeers loads peers in this store. It scans the db engine, loads all regions and their peers from it
+// / WARN: This store should not be used before initialized.
 func (bs *Raftstore) loadPeers() ([]*peer, error) {
 	// Scan region meta to get saved regions.
 	startKey := meta.RegionMetaMinKey
@@ -146,6 +146,9 @@ func (bs *Raftstore) loadPeers() ([]*peer, error) {
 			if err != nil {
 				return errors.WithStack(err)
 			}
+			//
+			log.Infof("recover local state store=%d region=%d state=%v peers=%v",
+				storeID, regionID, localState.State, localState.Region.GetPeers())
 			region := localState.Region
 			if localState.State == rspb.PeerState_Tombstone {
 				tombStoneCount++
@@ -155,8 +158,17 @@ func (bs *Raftstore) loadPeers() ([]*peer, error) {
 
 			peer, err := createPeer(storeID, ctx.cfg, ctx.regionTaskSender, ctx.engine, region)
 			if err != nil {
-				return err
+				log.Infof("recover: store %d not in region %d peers, mark as tombstone: %v", storeID, regionID, err)
+				tombstoneState := &rspb.RegionLocalState{
+					State:  rspb.PeerState_Tombstone,
+					Region: region,
+				}
+				kvWB.SetMeta(meta.RegionStateKey(regionID), tombstoneState)
+				continue
 			}
+			//
+			log.Infof("recover load peer store=%d region=%d peer=%v", storeID, regionID, peer.Meta)
+
 			ctx.storeMeta.regionRanges.ReplaceOrInsert(&regionItem{region: region})
 			ctx.storeMeta.regions[regionID] = region
 			// No need to check duplicated here, because we use region id as the key
@@ -255,6 +267,8 @@ func (bs *Raftstore) start(
 	}
 
 	for _, peer := range regionPeers {
+		//
+		log.Infof("recover register peer region=%d peer=%v", peer.regionId, peer.Meta)
 		bs.router.register(peer)
 	}
 	bs.startWorkers(regionPeers)
@@ -273,6 +287,9 @@ func (bs *Raftstore) startWorkers(peers []*peer) {
 	router.sendStore(message.Msg{Type: message.MsgTypeStoreStart, Data: ctx.store})
 	for i := 0; i < len(peers); i++ {
 		regionID := peers[i].regionId
+		//
+		log.Infof("recover start peer region=%d peer=%v", regionID, peers[i].Meta)
+
 		_ = router.send(regionID, message.Msg{RegionID: regionID, Type: message.MsgTypeStart})
 	}
 	engines := ctx.engine

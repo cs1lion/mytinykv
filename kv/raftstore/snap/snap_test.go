@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"sync/atomic"
 	"testing"
@@ -126,7 +125,7 @@ func TestSnapGenMeta(t *testing.T) {
 }
 
 func TestSnapDisplayPath(t *testing.T) {
-	dir, err := ioutil.TempDir("", "snapshot")
+	dir, err := os.MkdirTemp("", "snapshot")
 	require.Nil(t, err)
 	defer os.RemoveAll(dir)
 	key := &SnapKey{1, 1, 2}
@@ -143,7 +142,7 @@ func TestSnapFile(t *testing.T) {
 func doTestSnapFile(t *testing.T, dbHasData bool) {
 	regionID := uint64(1)
 	region := genTestRegion(regionID, 1, 1)
-	dir, err := ioutil.TempDir("", "snapshot")
+	dir, err := os.MkdirTemp("", "snapshot")
 	require.Nil(t, err)
 	defer os.RemoveAll(dir)
 	db := openDB(t, dir)
@@ -151,7 +150,7 @@ func doTestSnapFile(t *testing.T, dbHasData bool) {
 		fillDBData(t, db)
 	}
 
-	snapDir, err := ioutil.TempDir("", "snapshot")
+	snapDir, err := os.MkdirTemp("", "snapshot")
 	require.Nil(t, err)
 	defer os.RemoveAll(snapDir)
 	key := SnapKey{RegionID: regionID, Term: 1, Index: 1}
@@ -186,7 +185,7 @@ func doTestSnapFile(t *testing.T, dbHasData bool) {
 	require.Nil(t, err, errors.ErrorStack(err))
 	assert.True(t, s2.Exists())
 
-	dstDir, err := ioutil.TempDir("", "snapshot")
+	dstDir, err := os.MkdirTemp("", "snapshot")
 	require.Nil(t, err)
 	defer os.RemoveAll(dstDir)
 
@@ -216,7 +215,7 @@ func doTestSnapFile(t *testing.T, dbHasData bool) {
 	require.Nil(t, err)
 	assert.True(t, s4.Exists())
 
-	dstDBDir, err := ioutil.TempDir("", "snapshot")
+	dstDBDir, err := os.MkdirTemp("", "snapshot")
 	require.Nil(t, err)
 	defer os.RemoveAll(dstDBDir)
 

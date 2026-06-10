@@ -14,6 +14,7 @@ import (
 	"github.com/Connor1996/badger"
 	"github.com/pingcap-incubator/tinykv/kv/config"
 	"github.com/pingcap-incubator/tinykv/kv/raftstore"
+	"github.com/pingcap-incubator/tinykv/kv/raftstore/util"
 	"github.com/pingcap-incubator/tinykv/kv/storage/raft_storage"
 	"github.com/pingcap-incubator/tinykv/kv/util/engine_util"
 	"github.com/pingcap-incubator/tinykv/log"
@@ -276,6 +277,11 @@ func (c *Cluster) GetRegion(key []byte) *metapb.Region {
 		// retry to get the region again.
 		SleepMS(20)
 	}
+	//
+	for _, r := range c.schedulerClient.DebugRegions() {
+		log.Warnf("scheduler region id=%d start=%q end=%q epoch=%v",
+			r.GetId(), r.GetStartKey(), r.GetEndKey(), r.GetRegionEpoch())
+	}
 	panic(fmt.Sprintf("find no region for %s", hex.EncodeToString(key)))
 }
 
@@ -374,6 +380,15 @@ func (c *Cluster) Scan(start, end []byte) [][]byte {
 			panic("resp.Responses[0].CmdType != raft_cmdpb.CmdType_Snap")
 		}
 		region := resp.Responses[0].GetSnap().Region
+		if err := util.CheckKeyInRegion(key, region); err != nil {
+			if txn != nil {
+				txn.Discard()
+			}
+			log.Warnf("scan retry for key=%q due to stale snap region id=%d start=%q end=%q epoch=%v",
+				key, region.GetId(), region.GetStartKey(), region.GetEndKey(), region.GetRegionEpoch())
+			SleepMS(20)
+			continue
+		}
 		iter := raft_storage.NewRegionReader(txn, *region).IterCF(engine_util.CfDefault)
 		for iter.Seek(key); iter.Valid(); iter.Next() {
 			if engine_util.ExceedEndKey(iter.Item().Key(), end) {

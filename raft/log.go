@@ -14,13 +14,15 @@
 
 package raft
 
-import pb "github.com/pingcap-incubator/tinykv/proto/pkg/eraftpb"
+import (
+	pb "github.com/pingcap-incubator/tinykv/proto/pkg/eraftpb"
+)
 
 // RaftLog manage the log entries, its struct look like:
 //
-//  snapshot/first.....applied....committed....stabled.....last
-//  --------|------------------------------------------------|
-//                            log entries
+//	snapshot/first.....applied....committed....stabled.....last
+//	--------|------------------------------------------------|
+//	                          log entries
 //
 // for simplify the RaftLog implement should manage all log entries
 // that not truncated
@@ -50,13 +52,36 @@ type RaftLog struct {
 	pendingSnapshot *pb.Snapshot
 
 	// Your Data Here (2A).
+	dummyIndex uint64
 }
 
 // newLog returns log using the given storage. It recovers the log
 // to the state that it just commits and applies the latest snapshot.
 func newLog(storage Storage) *RaftLog {
 	// Your Code Here (2A).
-	return nil
+	firstindex, err := storage.FirstIndex()
+	if err != nil {
+		panic(err)
+	}
+
+	lastindex, err := storage.LastIndex()
+	if err != nil {
+		panic(err)
+	}
+
+	entries, err := storage.Entries(firstindex, lastindex+1)
+	if err != nil && err != ErrUnavailable {
+		panic(err)
+	}
+
+	return &RaftLog{
+		storage:    storage,
+		entries:    entries,
+		committed:  firstindex - 1,
+		applied:    firstindex - 1,
+		stabled:    lastindex,
+		dummyIndex: firstindex - 1,
+	}
 }
 
 // We need to compact the log entries in some point of time like
@@ -64,6 +89,27 @@ func newLog(storage Storage) *RaftLog {
 // grow unlimitedly in memory
 func (l *RaftLog) maybeCompact() {
 	// Your Code Here (2C).
+	first, err := l.storage.FirstIndex()
+	if err != nil {
+		return
+	}
+	// ⚠️ 关键修改：不要压缩已提交但未应用的日志
+	// 只能安全地压缩已经应用的索引
+	compactIdx := first - 1
+	if compactIdx > l.applied {
+		compactIdx = l.applied
+	}
+	if compactIdx <= l.dummyIndex {
+		return
+	}
+
+	offset := compactIdx - l.dummyIndex
+	if offset >= uint64(len(l.entries)) {
+		l.entries = nil
+	} else {
+		l.entries = l.entries[offset:]
+	}
+	l.dummyIndex = compactIdx
 }
 
 // allEntries return all the entries not compacted.
@@ -71,29 +117,105 @@ func (l *RaftLog) maybeCompact() {
 // note, this is one of the test stub functions you need to implement.
 func (l *RaftLog) allEntries() []pb.Entry {
 	// Your Code Here (2A).
-	return nil
+
+	return append([]pb.Entry(nil), l.entries...)
 }
 
 // unstableEntries return all the unstable entries
 func (l *RaftLog) unstableEntries() []pb.Entry {
-	// Your Code Here (2A).
-	return nil
+	if len(l.entries) == 0 {
+		return nil
+	}
+	if l.stabled < l.dummyIndex {
+		return nil
+	}
+	start := l.stabled - l.dummyIndex
+	if start >= uint64(len(l.entries)) {
+		return nil
+	}
+	return l.entries[start:]
 }
 
 // nextEnts returns all the committed but not applied entries
-func (l *RaftLog) nextEnts() (ents []pb.Entry) {
-	// Your Code Here (2A).
-	return nil
+func (l *RaftLog) nextEnts() []pb.Entry {
+	if l.committed <= l.applied {
+		return nil
+	}
+
+	lo := l.applied + 1
+	hi := l.committed
+
+	// 当前内存窗口的绝对范围是 [dummyIndex+1, LastIndex()]
+	first := l.dummyIndex + 1
+	last := l.LastIndex()
+
+	if hi < first || lo > last {
+		return nil
+	}
+	if lo < first {
+		lo = first
+	}
+	if hi > last {
+		hi = last
+	}
+	if lo > hi {
+		return nil
+	}
+
+	start := lo - l.dummyIndex - 1
+	end := hi - l.dummyIndex
+	if end > uint64(len(l.entries)) {
+		end = uint64(len(l.entries))
+	}
+	if start >= end {
+		return nil
+	}
+	return append([]pb.Entry(nil), l.entries[start:end]...)
 }
 
 // LastIndex return the last index of the log entries
 func (l *RaftLog) LastIndex() uint64 {
 	// Your Code Here (2A).
-	return 0
+	if len(l.entries) > 0 {
+		return l.entries[len(l.entries)-1].Index
+	}
+	if l.pendingSnapshot != nil && l.pendingSnapshot.Metadata != nil {
+		return l.pendingSnapshot.Metadata.Index
+	}
+	lastindex, err := l.storage.LastIndex()
+	if err != nil {
+		panic(err)
+	}
+	return lastindex
 }
 
 // Term return the term of the entry in the given index
 func (l *RaftLog) Term(i uint64) (uint64, error) {
-	// Your Code Here (2A).
-	return 0, nil
+	if l.pendingSnapshot != nil && l.pendingSnapshot.Metadata != nil &&
+		i == l.pendingSnapshot.Metadata.Index {
+		return l.pendingSnapshot.Metadata.Term, nil
+	}
+
+	if i < l.dummyIndex {
+		return 0, ErrCompacted
+	}
+	if i == l.dummyIndex {
+		return l.storage.Term(i)
+	}
+
+	if len(l.entries) == 0 {
+		return 0, ErrUnavailable
+	}
+
+	first := l.dummyIndex + 1
+	last := l.dummyIndex + uint64(len(l.entries))
+	if i < first {
+		return 0, ErrCompacted
+	}
+	if i > last {
+		return 0, ErrUnavailable
+	}
+
+	offset := i - first
+	return l.entries[offset].Term, nil
 }
