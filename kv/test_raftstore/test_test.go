@@ -21,27 +21,27 @@ import (
 )
 
 // a client runs the function f and then signals it is done
-func runClient(t *testing.T, me int, ca chan bool, fn func(me int, t *testing.T)) {
+func runClient(me int, ca chan bool, fn func(me int)) {
 	ok := false
 	defer func() { ca <- ok }()
-	fn(me, t)
+	fn(me)
 	ok = true
 }
 
 // spawn ncli clients and wait until they are all done
-func SpawnClientsAndWait(t *testing.T, ch chan bool, ncli int, fn func(me int, t *testing.T)) {
+func SpawnClientsAndWait(ch chan bool, ncli int, fn func(me int)) {
 	defer func() { ch <- true }()
 	ca := make([]chan bool, ncli)
 	for cli := 0; cli < ncli; cli++ {
 		ca[cli] = make(chan bool)
-		go runClient(t, cli, ca[cli], fn)
+		go runClient(cli, ca[cli], fn)
 	}
 	// log.Printf("SpawnClientsAndWait: waiting for clients")
 	for cli := 0; cli < ncli; cli++ {
 		ok := <-ca[cli]
 		// log.Infof("SpawnClientsAndWait: client %d is done\n", cli)
 		if ok == false {
-			t.Fatalf("failure")
+			log.Fatalf("failure")
 		}
 	}
 
@@ -83,7 +83,7 @@ func checkConcurrentAppends(t *testing.T, v string, counts []int) {
 }
 
 // make network chaos among servers
-func networkchaos(t *testing.T, cluster *Cluster, ch chan bool, done *int32, unreliable bool, partitions bool, electionTimeout time.Duration) {
+func networkchaos(cluster *Cluster, ch chan bool, done *int32, unreliable bool, partitions bool, electionTimeout time.Duration) {
 	defer func() { ch <- true }()
 	for atomic.LoadInt32(done) == 0 {
 		if partitions {
@@ -115,7 +115,7 @@ func networkchaos(t *testing.T, cluster *Cluster, ch chan bool, done *int32, unr
 	}
 }
 
-func confchanger(t *testing.T, cluster *Cluster, ch chan bool, done *int32) {
+func confchanger(cluster *Cluster, ch chan bool, done *int32) {
 	defer func() { ch <- true }()
 	count := uint64(cluster.count)
 	for atomic.LoadInt32(done) == 0 {
@@ -197,7 +197,7 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 		// log.Printf("Iteration %v\n", i)
 		atomic.StoreInt32(&done_clients, 0)
 		atomic.StoreInt32(&done_partitioner, 0)
-		go SpawnClientsAndWait(t, ch_clients, nclients, func(cli int, t *testing.T) {
+		go SpawnClientsAndWait(ch_clients, nclients, func(cli int) {
 			j := 0
 			defer func() {
 				clnts[cli] <- j
@@ -227,12 +227,12 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 		if unreliable || partitions {
 			// Allow the clients to perform some operations without interruption
 			time.Sleep(300 * time.Millisecond)
-			go networkchaos(t, cluster, ch_partitioner, &done_partitioner, unreliable, partitions, electionTimeout)
+			go networkchaos(cluster, ch_partitioner, &done_partitioner, unreliable, partitions, electionTimeout)
 		}
 		if confchange {
 			// Allow the clients to perfrom some operations without interruption
 			time.Sleep(100 * time.Millisecond)
-			go confchanger(t, cluster, ch_confchange, &done_confchanger)
+			go confchanger(cluster, ch_confchange, &done_confchanger)
 		}
 		time.Sleep(5 * time.Second)
 		atomic.StoreInt32(&done_clients, 1)     // tell clients to quit
