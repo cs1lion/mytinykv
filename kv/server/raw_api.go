@@ -2,8 +2,8 @@ package server
 
 import (
 	"context"
-	"github.com/pingcap-incubator/tinykv/proto/pkg/kvrpcpb"
 	"github.com/pingcap-incubator/tinykv/kv/storage"
+	"github.com/pingcap-incubator/tinykv/proto/pkg/kvrpcpb"
 )
 
 // The functions below are Server's Raw API. (implements TinyKvServer).
@@ -27,7 +27,7 @@ func (server *Server) RawGet(_ context.Context, req *kvrpcpb.RawGetRequest) (*kv
 		}, nil
 	}
 	return &kvrpcpb.RawGetResponse{
-		Value:    val,
+		Value: val,
 	}, nil
 }
 
@@ -35,11 +35,11 @@ func (server *Server) RawGet(_ context.Context, req *kvrpcpb.RawGetRequest) (*kv
 func (server *Server) RawPut(_ context.Context, req *kvrpcpb.RawPutRequest) (*kvrpcpb.RawPutResponse, error) {
 	// Your Code Here (1).
 	// Hint: Consider using Storage.Modify to store data to be modified
-	modify:= storage.Modify{
+	modify := storage.Modify{
 		Data: storage.Put{
-			Key: req.Key,
+			Key:   req.Key,
 			Value: req.Value,
-			Cf: req.Cf,
+			Cf:    req.Cf,
 		},
 	}
 	err := server.storage.Write(req.Context, []storage.Modify{modify})
@@ -59,11 +59,11 @@ func (server *Server) RawDelete(_ context.Context, req *kvrpcpb.RawDeleteRequest
 			Cf:  req.Cf,
 		},
 	}
-		err := server.storage.Write(req.Context, []storage.Modify{modify})
-		if err != nil {
-			return nil, err
-		}
-		return &kvrpcpb.RawDeleteResponse{}, nil
+	err := server.storage.Write(req.Context, []storage.Modify{modify})
+	if err != nil {
+		return nil, err
+	}
+	return &kvrpcpb.RawDeleteResponse{}, nil
 }
 
 // RawScan scan the data starting from the start key up to limit. and return the corresponding result
@@ -78,16 +78,16 @@ func (server *Server) RawScan(_ context.Context, req *kvrpcpb.RawScanRequest) (*
 	iter := reader.IterCF(req.Cf)
 	defer iter.Close()
 
-	kvs := make([]*kvrpcpb.KvPair, 0,req.Limit)
-	for iter.Seek(req.StartKey); iter.Valid()&&uint32(len(kvs))<req.Limit; iter.Next() {
+	kvs := make([]*kvrpcpb.KvPair, 0, req.Limit)
+	for iter.Seek(req.StartKey); iter.Valid() && uint32(len(kvs)) < req.Limit; iter.Next() {
 		item := iter.Item()
-		
+
 		val, err := item.ValueCopy(nil)
 		if err != nil {
 			return nil, err
 		}
 		kvs = append(kvs, &kvrpcpb.KvPair{
-			Key: item.KeyCopy(nil),
+			Key:   item.KeyCopy(nil),
 			Value: val,
 		})
 	}

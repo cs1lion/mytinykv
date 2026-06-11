@@ -17,7 +17,7 @@ type StandAloneStorage struct {
 
 func NewStandAloneStorage(conf *config.Config) *StandAloneStorage {
 	// Your Code Here (1).
-	db:=engine_util.CreateDB(conf.DBPath, false);
+	db := engine_util.CreateDB(conf.DBPath, false)
 	return &StandAloneStorage{inner: db}
 }
 
@@ -33,8 +33,7 @@ func (s *StandAloneStorage) Stop() error {
 
 func (s *StandAloneStorage) Reader(ctx *kvrpcpb.Context) (storage.StorageReader, error) {
 	// Your Code Here (1).
-	txn:= s.inner.NewTransaction(false);
-
+	txn := s.inner.NewTransaction(false)
 
 	return &StandAloneStorageReader{txn: txn}, nil
 }
@@ -42,22 +41,22 @@ func (s *StandAloneStorage) Reader(ctx *kvrpcpb.Context) (storage.StorageReader,
 func (s *StandAloneStorage) Write(ctx *kvrpcpb.Context, batch []storage.Modify) error {
 	// Your Code Here (1).
 	return s.inner.Update(func(txn *badger.Txn) error {
-        for _, m := range batch {
-            switch data := m.Data.(type) {
-            case storage.Put:
-                err := txn.Set(engine_util.KeyWithCF(data.Cf, data.Key), data.Value)
-                if err != nil {
-                    return err
-                }
-            case storage.Delete:
-                err := txn.Delete(engine_util.KeyWithCF(data.Cf, data.Key))
-                if err != nil {
-                    return err
-                }
-            }
-        }
-        return nil
-    })
+		for _, m := range batch {
+			switch data := m.Data.(type) {
+			case storage.Put:
+				err := txn.Set(engine_util.KeyWithCF(data.Cf, data.Key), data.Value)
+				if err != nil {
+					return err
+				}
+			case storage.Delete:
+				err := txn.Delete(engine_util.KeyWithCF(data.Cf, data.Key))
+				if err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
 }
 
 type StandAloneStorageReader struct {
@@ -84,5 +83,5 @@ func (r *StandAloneStorageReader) Close() {
 func (r *StandAloneStorageReader) IterCF(cf string) engine_util.DBIterator {
 	// Your Code Here (1).
 
-	return engine_util.NewCFIterator(cf,r.txn)
+	return engine_util.NewCFIterator(cf, r.txn)
 }

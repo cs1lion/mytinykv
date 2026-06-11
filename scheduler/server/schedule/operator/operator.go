@@ -331,10 +331,10 @@ func CreateTransferLeaderOperator(desc string, region *core.RegionInfo, sourceSt
 
 // interleaveStepGroups interleaves two slice of step groups. For example:
 //
-//  a = [[opA1, opA2], [opA3], [opA4, opA5, opA6]]
-//  b = [[opB1], [opB2], [opB3, opB4], [opB5, opB6]]
-//  c = interleaveStepGroups(a, b, 0)
-//  c == [opA1, opA2, opB1, opA3, opB2, opA4, opA5, opA6, opB3, opB4, opB5, opB6]
+//	a = [[opA1, opA2], [opA3], [opA4, opA5, opA6]]
+//	b = [[opB1], [opB2], [opB3, opB4], [opB5, opB6]]
+//	c = interleaveStepGroups(a, b, 0)
+//	c == [opA1, opA2, opB1, opA3, opB2, opA4, opA5, opA6, opB3, opB4, opB5, opB6]
 //
 // sizeHint is a hint for the capacity of returned slice.
 func interleaveStepGroups(a, b [][]OpStep, sizeHint int) []OpStep {
@@ -367,7 +367,7 @@ func CreateMovePeerOperator(desc string, cluster Cluster, region *core.RegionInf
 
 // CreateOfflinePeerOperator creates an operator that replaces an old peer with a new peer when offline a store.
 func CreateOfflinePeerOperator(desc string, cluster Cluster, region *core.RegionInfo, kind OpKind, oldStore, newStore uint64, peerID uint64) (*Operator, error) {
-	k, steps, err := transferLeaderStep(cluster, region, oldStore, append(getRegionFollowerIDs(region)))
+	k, steps, err := transferLeaderStep(cluster, region, oldStore, getRegionFollowerIDs(region))
 	if err != nil {
 		return nil, err
 	}

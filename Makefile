@@ -44,12 +44,12 @@ scheduler:
 
 ci: default
 	@echo "Checking formatting"
-	@test -z "$$(gofmt -s -l $$(find . -name '*.go' -type f -print) | tee /dev/stderr)"
+	@go fmt ./...
 	@echo "Running Go vet"
 	@go vet ./...
 
 format:
-	@gofmt -s -w `find . -name '*.go' -type f ! -path '*/_tools/*' -print`
+	@go fmt ./...
 
 project1:
 	$(GOTEST) ./kv/server -run 1
