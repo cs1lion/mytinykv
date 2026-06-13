@@ -124,14 +124,14 @@ func (l *RaftLog) allEntries() []pb.Entry {
 // unstableEntries return all the unstable entries
 func (l *RaftLog) unstableEntries() []pb.Entry {
 	if len(l.entries) == 0 {
-		return nil
+		return []pb.Entry{}
 	}
 	if l.stabled < l.dummyIndex {
-		return nil
+		return []pb.Entry{}
 	}
 	start := l.stabled - l.dummyIndex
 	if start >= uint64(len(l.entries)) {
-		return nil
+		return []pb.Entry{}
 	}
 	return l.entries[start:]
 }
