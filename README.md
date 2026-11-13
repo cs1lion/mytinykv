@@ -1,5 +1,5 @@
 # TinyKV
-
+![Go Distributed KV](https://img.shields.io/badge/Go-Distributed%20KV-blue) ![License Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue)
 TinyKV is a distributed key-value storage engine in Go implementing Raft consensus, Multi-Raft region split, and Percolator-style MVCC transactions.
 
 ## Core Features
